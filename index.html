@@ -1,0 +1,621 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+  <title>TCP-IP Calculator</title>
+  <style type="text/css">
+    #headline { font-size:18pt; font-weight:bold; }
+    #bottom   { position:fixed; bottom:10px; }
+    #outputDiv table { width:50%; }
+    #outputDiv     * { border: 1px solid black;
+                       border-collapse:collapse;  }
+    #outputDiv td#dataTitle { width:50px;
+                              background-color: gray; }
+    #outputDiv td           { width:100px;
+                              padding: 2px; }
+  </style>
+  <!-- analytics -->
+  <script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-17778150-2']);
+  _gaq.push(['_setDomainName', '.godale.org']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+  </script>
+  <!-- end analytics -->
+</head>
+
+<body>
+  <!-- 26feb2016 - 1104CT -->
+  <!-- always use *1 to convert to int -->
+  <script type="text/javascript">
+    <!-- comment to hide javascript from archaic browsers
+    // locations in output table
+    const outputColumn   = 1;  // output is always in 2nd column
+    const outputColumnV6 = 3;  // ipV6 output is always in 3rd column
+    const ipOutputRow              = 0;
+    const ipHexOutputRow           = 1;
+    const subnetOutputRow          = 2;
+    const subnetSlashOutputRow     = 3;
+    const hostZeroOutputRow        = 4;
+    const subnetBcastOutputRow     = 5;
+    const subnetHostCountOutputRow = 6;
+
+    const slashNum = [ "0.0.0.0",         "128.0.0.0",       "192.0.0.0",       "224.0.0.0",
+                       "240.0.0.0",       "248.0.0.0",       "252.0.0.0",       "254.0.0.0",
+                       "255.0.0.0",       "255.128.0.0",     "255.192.0.0",     "255.224.0.0",
+                       "255.240.0.0",     "255.248.0.0",     "255.252.0.0",     "255.254.0.0",
+                       "255.255.0.0",     "255.255.128.0",   "255.255.192.0",   "255.255.224.0",
+                       "255.255.240.0",   "255.255.248.0",   "255.255.252.0",   "255.255.254.0",
+                       "255.255.255.0",   "255.255.255.128", "255.255.255.192", "255.255.255.224",
+                       "255.255.255.240", "255.255.255.248", "255.255.255.252", "255.255.255.254",
+                       "255.255.255.255" ];
+
+    const IPv6networkForIPv4 = "::ffff:";
+
+    function hex2dec(string)
+    {
+      return parseInt(string, 16);
+    }
+
+    function dec2hex(number)
+    {
+      return number.toString(16);
+    }
+
+    function stripLeadZeroXandSpaces(string)
+    {
+      var ip      = string.replace(/(^\s*0x|\s)/gi,""); // remove leading 0x|0X and any spaces
+      var splitIP = ip.split('.');
+      if (splitIP.length != 4)
+      {
+        ip = ip.replace(/\./g,""); // remove all '.' as this isn't valid IPv4
+      }
+      return ip;
+    }
+
+    ///////////////////////////////////////
+    ///////////////// ipv4 conversion/decode routines
+
+    function invertIPv4(string)
+    {
+      var splitIP = new Array();
+
+      splitIP = string.split('.');
+
+      if (splitIP.length == 4)
+      {
+        // verify that these are all numbers 0-255!
+        for(loop = 0; loop < 4; loop++)
+        {
+          var value = splitIP[loop] * 1; // convert to int
+
+          if (isNaN(value) || (value < 0) || (value > 255))
+          {
+            return "Invalid invertIPv4 bad octet " + loop;
+          }
+          splitIP[loop] = ~value & 0xff;
+        }
+        // made it this far? looks good
+        return splitIP[0] + "." + splitIP[1] + "." + splitIP[2] + "." + splitIP[3];
+      }
+      else
+      {  return "Invalid invertIPv4"; }
+    }
+
+    function wildcard(string)
+    {
+      var splitIP = new Array();
+
+      splitIP = string.split('.');
+
+      if (splitIP.length == 4)
+      {
+         // msb set? (if set this implies a mask)
+         return (((splitIP[0] * 1) & 0x80) == 0);
+      }
+      return false;
+    }
+
+    function validIPv4(stringOrNum)
+    {
+      var string = stringOrNum.toString(); // nums cause issues as split/etc don't operate on them
+      var splitIP = new Array();
+
+      splitIP = string.split('.');
+
+      if (splitIP.length == 4)
+      {
+        // verify that these are all numbers 0-255!
+        for(loop = 0; loop < 4; loop++)
+        {
+          var value = splitIP[loop] * 1; // convert to int
+
+          if (isNaN(value) || (value < 0) || (value > 255))
+          { return false; }
+        }
+        // made it this far? looks good
+        return true;
+      }
+      else
+      { return false; }
+    }
+
+    function validIPv4Hex(stringOrNum)
+    {
+      var string = stringOrNum.toString(); // nums cause issues as split/etc don't operate on them
+      var len = string.length;
+
+      if (len == 8)
+      {
+        string = string.toUpperCase();
+        for(loop = 0; loop < len; loop++)
+        {
+          var ch = string.charAt(loop);
+          // a valid hex character?
+          if ( !(/[0-9,a-f,A-F]/.test(ch)) )
+          { return false; }
+        }
+        // got this far looks like valid hex
+        return true;
+      }
+      else
+      { return false; /* need 8 digits for hex (although could zero-extend to 8digits) */ }
+    }
+
+    function convertIPv4ToHex(ip)
+    {
+      var splitIP = new Array();
+      var result  = "";
+
+      splitIP = ip.split('.');
+
+      if (splitIP.length == 4)
+      {
+        for(loop = 0; loop < 4; loop++)
+        {
+          // don't use dec2hex - doesn't always return 2 digits (eg %02x)
+          var value = splitIP[loop] * 1; // convert to int
+          var upper = (value - (value % 16)) / 16;
+          var lower = value - upper*16;
+          
+          result = result + dec2hex(upper) + dec2hex(lower);
+        }
+        return result;
+      }
+      else
+      { return -1; }
+    }
+
+    function convertHexToIPv4(ip)
+    {
+      var result  = "";
+      var len     = ip.length;
+      var byte;
+
+      if (len == 7)
+      {
+        ip = "0" + ip; // save ourselves by pre-pending zero's
+        len = ip.length;
+      }
+      if (len != 8)
+      { return -1; /* error */ }
+
+      for(loop = 0; loop < len; loop++)
+      {
+        byte = "";
+        byte = ip.charAt(loop); // first digit
+        loop++;
+        byte = byte + ip.charAt(loop); // 2nd digit
+        result = result + hex2dec(byte);
+        if (loop < (len -1))
+        {
+          result = result + ".";
+        }
+      }
+      return result;
+    }
+
+    function convertSubnetToSlash(subnet)
+    {
+      var len = slashNum.length;
+
+      for (loop = 0; loop < len; loop++)
+      {
+        if (subnet == slashNum[loop])
+        {
+          return "/" + loop;
+        }
+      }
+      return -1;
+    }
+
+    function convertSlashToSubnet(slash)
+    {
+      var slashN = slash * 1; // convert to int
+      if (isNaN(slashN))
+      {
+        // remove leading whitespace & slash
+        slash = slash.replace(/[\b]*\//, '');
+
+        slashN = slash * 1;
+        if (isNaN(slashN))
+        { return -1; /* invalid format */ }
+      }
+
+      if ((slashN >= 0) && (slashN < slashNum.length))
+      {
+        return slashNum[slashN];
+      }
+      return -1; // out of range
+    }
+
+    function isPrivateIPv4Net(netHex)
+    {
+      // no validation that this is IPv4!
+      var net = hex2dec(netHex);
+
+      // as per RFC1918 these are private nets: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+      if (((net & 0xff000000) == (10 << 24)) ||
+          ((net & 0xfff00000) == ((172 << 24) | (16 << 16))) ||
+          ((net & 0xffff0000) == ((192 << 24) | (168 << 16))))
+      {
+        return "(private rfc1918)";
+      }
+      // as per RFC5737 these are 'illegal' documentation nets: 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24
+      else if (((net & 0xffffff00) == ((192 << 24) | (0  << 16) | (2   << 8))) ||
+               ((net & 0xffffff00) == ((198 << 24) | (51 << 16) | (100 << 8))) ||
+               ((net & 0xffffff00) == ((203 << 24) | (0  << 16) | (113 << 8))))
+      {
+        return "(illegal rfc5737 doc-only)";
+      }
+      return ""; // note that IPv6 is not 'supported' yet
+    }
+
+    ///////////////////////////////////////
+    ///////////////// v4->v6 conversion
+    function convertIPv4toIPv6(ip)
+    {
+      // IP is already in dot'd..just prepend the IPv4 network
+      return IPv6networkForIPv4 + ip;
+    }
+
+    function convertIPv4toIPv6hex(ip)
+    {
+      var hexIP = convertIPv4ToHex(ip);
+      return IPv6networkForIPv4 + hexIP.substr(0,4) + ":" + hexIP.substr(4,4);
+    }
+
+    ///////////////////////////////////////
+    ///////////////// v6 conversion/decode routines
+    // from:
+    //   http://tools.ietf.org/html/rfc4861
+    //   http://msdn.microsoft.com/en-us/library/ms882950.aspx
+
+    function isIPv6multicast(ip)
+    {
+      return ip.match(/^FF.*/);
+    }
+
+    function IPv6multicast_type(ip)
+    {
+      // multicast wellknown/locallyDefined
+      // rfc2373 only defines low bit
+      if (ip.match(/^FF0.*/))      {        return "Well-known (IANA defined)";      }
+      else if (ip.match(/^FF1.*/)) {        return "Transient";                      }
+      // ...................................catch-all invalid
+      return "Illegal flag value '" + ip.charAt(2) + "'"; // flag
+    }
+
+    function IPv6multicast_scope(ip)
+    {
+      // multicast scope
+      // rfc2373 only defines these values
+      if (ip.match(/^FF.1.*/))      {        return "Node-local";          }
+      else if (ip.match(/^FF.2.*/)) {        return "Link-local";          }
+      else if (ip.match(/^FF.8.*/)) {        return "Organization-local";  }
+      else if (ip.match(/^FF.E.*/)) {        return "Global";              }
+      else                          {        return "illegal scope value " + ip.charAt(3);      }
+    }
+
+    function IPv6multicast_GroupID(ip)
+    {
+      var ipNoColon = ip.replace(/:/g, "");
+      return "Group ID: " + ipNoColon.substring(4, 14 /* 14chars = (112bits/8bits per char) */);
+    }
+
+    function IPv6multicast_specialName(ip)
+    {
+      if (ip.match(/^FF01::1$/))      {      return "Node-local All-nodes address";      }
+      else if (ip.match(/^FF02::1$/)) {      return "Link-local All-nodes address";      }
+      else if (ip.match(/^FF01::2$/)) {      return "Node-local All-routers address";    }
+      else if (ip.match(/^FF02::2$/)) {      return "Link-local All-routers address";    }
+      return ""; // .........................no special name for this one!
+    }
+
+    function IPv6multicast_neighborDiscoveryLocalNode(ip)
+    {
+      if (ip.match(/^FF02::1:FF00:0\/104/))
+      {
+        return "Neighbor discovery for matching lower 32bit on Link local - aka solicited node Address";
+      }
+      return ""; // not ND for local node
+    }
+
+    function IPv6link_local(ip)
+    {
+      if (ip.match(/^FE80.*/))       {       return "Link local";   }
+      else                           {       return "";             }
+    }
+
+    function IPv6aggretatable_global(ip)
+    {
+      if (ip.match(/^001.*/))        {       return "Global Aggregate Unicast"; }
+      else                           {       return "";                         }
+    }
+
+    ///////////////////////////////////////
+    ///////////////// html field modifiers 
+
+    function clearIPv6fields(outputTable)
+    {
+      for(row = 0; row < 3; row++)
+      {
+        for(col = 0; col < 4; col++)
+        {
+          outputTable.rows[row].cells[col].innerHTML = "";
+        }
+      }
+    }
+
+    // called to fill hostZero & subnetBroadcast fields
+    function fillHostZeroSubnetBroadcastHostCount()
+    {
+      var outSubnetValue = (document.getElementById('output').rows[subnetOutputRow].cells)[outputColumn].innerHTML;
+      var outIPhexValue  = (document.getElementById('output').rows[ipHexOutputRow].cells)[outputColumn].innerHTML;
+      if ((outIPhexValue == "")  || (outIPhexValue == "?")  ||
+          (outSubnetValue == "") || (outSubnetValue == "?") || (outSubnetValue == "0.0.0.0"))
+      {
+        return; // no ip or subnet == no HostZero and no SubnetBroadcast
+      }
+      else
+      {
+        var outHostZero        = document.getElementById('output').rows[hostZeroOutputRow].cells;
+        var outSubnetBcast     = document.getElementById('output').rows[subnetBcastOutputRow].cells;
+        var outSubnetHostCount = document.getElementById('output').rows[subnetHostCountOutputRow].cells;
+        var ip             = hex2dec(outIPhexValue);
+        var subnet         = hex2dec(convertIPv4ToHex(outSubnetValue));
+        var hostZeroHex    = dec2hex( (ip &  subnet) >>> 0);  // javascript bitwise converts to int32, >>> converts back to uint32
+        var subnetBcastHex = dec2hex( (ip | ~subnet) >>> 0);  // we must convert or else dec2hex function fails to convert properly
+
+        outHostZero[outputColumn].innerHTML    = convertHexToIPv4(hostZeroHex);
+        outSubnetBcast[outputColumn].innerHTML = convertHexToIPv4(subnetBcastHex);
+        if ((outHostZero[outputColumn].innerHTML == -1) ||
+            (outSubnetBcast[outputColumn].innerHTML == -1))
+        {
+          outHostZero[outputColumn].innerHTML    = "";
+          outSubnetBcast[outputColumn].innerHTML = "";
+          alert("Can't create Host-Zero/Subnet-Broadcast!");
+        }
+        if (subnet == 0xffffFFFF)
+        {
+          //  \32 network...only one host
+          outSubnetHostCount[outputColumn].innerHTML = 1;
+        }
+        else
+        {
+          // -1 accounts for used IP's: host0, subBroadcast (since 0 based would've added 1 so instead we only -1 instead of -2)
+          outSubnetHostCount[outputColumn].innerHTML = ((subnet ^ 0xffffFFFF) -1);
+        }
+      }
+    }
+
+    // called when IP field looses focus
+    function ipBlur()
+    {
+      var outIP    = document.getElementById('output').rows[ipOutputRow].cells;
+      var outIPhex = document.getElementById('output').rows[ipHexOutputRow].cells;
+      var ip       = document.getElementById('IP').value;
+
+      // presume if a slash is present that we have ip/subnet
+      if (ip.match(/.*\/.*/))
+      {
+          var ipSubnet = ip.split('/');
+          ip     = ipSubnet[0];
+          subnet = ipSubnet[1];
+          document.getElementById('IP').value = ip;
+          document.getElementById('subnet').value = subnet;
+          subnetBlur();
+      }
+      ip = stripLeadZeroXandSpaces(ip);
+      if (validIPv4(ip))
+      {
+        outIP[outputColumn].innerHTML    = ip;
+        outIPhex[outputColumn].innerHTML = convertIPv4ToHex(ip);
+      }
+      else
+      {
+        if (validIPv4Hex(ip))
+        {
+          outIP[outputColumn].innerHTML      = convertHexToIPv4(ip);
+          outIPhex[outputColumn].innerHTML   = ip;
+        }
+        else
+        {
+          alert("not an IP address! (or hex?)");
+          return;
+        }
+      }
+      // fill v6 & network info
+      outIP[outputColumnV6].innerHTML    = convertIPv4toIPv6(outIP[outputColumn].innerHTML);
+      outIPhex[outputColumnV6].innerHTML = convertIPv4toIPv6hex(outIP[outputColumn].innerHTML);
+      fillHostZeroSubnetBroadcastHostCount();
+
+      // add private flag if necessary (do this after v6 to prevent corrupting that result!)
+      var privateSubnet  = isPrivateIPv4Net(outIPhex[outputColumn].innerHTML);
+      outIP[outputColumn].innerHTML = outIP[outputColumn].innerHTML.toString() + " " + privateSubnet;
+    }
+    
+    // called when subnet field looses focus
+    function subnetBlur()
+    {
+      var outSubnet      = document.getElementById('output').rows[subnetOutputRow].cells;
+      var outSubnetSlash = document.getElementById('output').rows[subnetSlashOutputRow].cells;
+      var subSlash       = document.getElementById('subnet').value;
+
+      subSlash = stripLeadZeroXandSpaces(subSlash);
+      if (validIPv4(subSlash))
+      {
+        // got subnet-mask/wildcard-form (eg 255.255.0.0)
+        if (wildcard(subSlash))
+        {
+           // got wildcard...invert it for mask
+           subSlash = invertIPv4(subSlash);
+        }
+        outSubnet[outputColumn].innerHTML      = subSlash;
+        outSubnetSlash[outputColumn].innerHTML = convertSubnetToSlash(subSlash);
+      }
+      else
+      {
+        // presume slash-form (eg /32)
+        outSubnet[outputColumn].innerHTML      = convertSlashToSubnet(subSlash);
+        outSubnetSlash[outputColumn].innerHTML = subSlash;
+      }
+      // failed to convert? (eg input invalid)
+      if ((outSubnetSlash[outputColumn].innerHTML == -1) ||
+          (outSubnet[outputColumn].innerHTML == -1))
+      {
+        var outHostZero        = document.getElementById('output').rows[hostZeroOutputRow].cells;
+        var outSubnetBcast     = document.getElementById('output').rows[subnetBcastOutputRow].cells;
+        var outSubnetHostCount = document.getElementById('output').rows[subnetHostCountOutputRow].cells;
+
+        outSubnet[outputColumn].innerHTML      = "";
+        outSubnetSlash[outputColumn].innerHTML = "";
+        outHostZero[outputColumn].innerHTML = "";
+        outSubnetBcast[outputColumn].innerHTML = "";
+        outSubnetHostCount[outputColumn].innerHTML = "";
+        alert("Invalid subnet conversion!");
+      }
+      fillHostZeroSubnetBroadcastHostCount();
+    }
+
+    // called when IPv6 address looses focus
+    function IPv6blur()
+    {
+      var ip = document.getElementById('IPv6').value.toUpperCase();
+      var outputTable = document.getElementById('outputV6');
+
+      clearIPv6fields(outputTable);
+
+      //////////
+      // row 0 column 0 -- multicast/unicast
+      if (isIPv6multicast(ip))
+      {
+        outputTable.rows[0].cells[0].innerHTML = "Multicast";
+
+        // row 0 column 1 -- multicast wellknown/locallyDefined
+        outputTable.rows[0].cells[1].innerHTML = IPv6multicast_type(ip);
+
+        // row 0 column 2 -- multicast scope
+        outputTable.rows[0].cells[2].innerHTML = IPv6multicast_scope(ip);
+
+        // row 0 column 3 -- GroupID
+        //  needs refinement...only low32b should be used normally
+        outputTable.rows[0].cells[3].innerHTML = IPv6multicast_GroupID(ip);
+
+        // row 1 column 0 -- match specials
+        outputTable.rows[1].cells[0].innerHTML = IPv6multicast_specialName(ip);
+
+        // row 2 column 0 -- neighbor discovery on local node (interface will be listening to FF02::1:<lower 32bits of its FE80 link local addr>)
+        outputTable.rows[2].cells[0].innerHTML = IPv6multicast_neighborDiscoveryLocalNode(ip);
+      }
+      else
+      {
+        outputTable.rows[0].cells[0].innerHTML = "Unicast";
+
+        // row 0 column 1 -- link local?
+        outputTable.rows[0].cells[1].innerHTML = IPv6link_local(ip);
+
+        // row 0 column 2 -- Aggregatable global unicast?
+        outputTable.rows[0].cells[2].innerHTML = IPv6aggretatable_global(ip);
+      }
+    }
+  -->
+  </script>
+
+  <div id="main">
+      <div id="headline">
+        IPv4 Subnet Calculator
+      </div>
+
+      <p>
+        Enter your IP and Subnet (can be in hex, also can have ip in slash format)
+        Once entered, hit &lt;tab&gt; or change focus to the other field to calculate IP &amp; Subnet values.
+      </p>
+      <table>
+        <tr>
+          <td>IP Address:</td>  <td><input type="text" id="IP"     onblur="ipBlur()"/></td>
+        </tr>
+        <tr>
+          <td>Subnet Mask/Wildcard:</td> <td><input type="text" id="subnet" onblur="subnetBlur()"/></td>
+        </tr>
+      </table>
+
+    <p/>
+
+    <div id="outputDiv">
+      <table id="output">
+        <tr>  <td id="dataTitle">IP:</td>            <td>?</td>   <td id="dataTitle">IPv6 form:</td> <td>?</td></tr>
+        <tr>  <td id="dataTitle">IP in hex:</td>     <td>?</td>   <td id="dataTitle">IPv6 hex form:</td> <td>?</td></tr>
+        <tr>  <td id="dataTitle">Subnet Mask:</td>   <td>?</td>   </tr>
+        <tr>  <td id="dataTitle">Subnet /:</td>      <td>?</td>   </tr>
+        <tr>  <td id="dataTitle">Host zero:</td>     <td>?</td>   </tr>
+        <tr>  <td id="dataTitle">Subnet bcast:</td>  <td>?</td>   </tr>
+        <tr>  <td id="dataTitle">Subnet # hosts:</td><td>?</td>   </tr>
+      </table>
+    </div>
+  </div>
+
+  <p/ style="height:30px;">
+  <hr/>
+  <div id="headline">
+    IPv6 Subnet Calculator
+  </div>
+  <p>
+    Alternate IPv6 calculator: <a href=https://duckduckgo.com/?q=ipv6+calculator&ia=web">https://duckduckgo.com/?q=ipv6+calculator&ia=web</a>
+  </p>
+  <p>
+    Enter IPv6 address (note that decode here is not complete! eg cannot handle most abbreviated addresses i.e. 1::1, also cannot handle subnets)
+  </p>
+
+  <table>
+    <tr>
+      <td>IPv6 Address:</td>    <td><input type="text" id="IPv6"     onblur="IPv6blur()"/></td>
+    </tr>
+  </table>
+
+  <p/>
+
+  <div id="outputDivV6">
+    <table id="outputV6">
+      <tr>    <td></td> <td></td> <td></td> <td></td></tr>
+      <tr>    <td></td> <td></td> <td></td> <td></td></tr>
+      <tr>    <td></td> <td></td> <td></td> <td></td></tr>
+    </table>
+  </div>
+
+  <div id="bottom">
+    (C)opyright 2019 Dale Schaafsma All rights reserved
+  </div>
+</body>
+
+</html>
