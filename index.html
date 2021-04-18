@@ -35,7 +35,6 @@
 </head>
 
 <body>
-  <!-- 26feb2016 - 1104CT -->
   <!-- always use *1 to convert to int -->
   <script type="text/javascript">
     <!-- comment to hide javascript from archaic browsers
@@ -270,6 +269,11 @@
           ((net & 0xffff0000) == ((192 << 24) | (168 << 16))))
       {
         return "(private rfc1918)";
+      }
+      // as per RFC6598 100.64.0.0/10 is "shared address space" eg Carrier Grade NAT
+      else if ((net & 0xffc00000) == ((100 << 24) | (64 << 16)))
+      {
+        return "('shared' rfc6598 CarrierNAT)";
       }
       // as per RFC5737 these are 'illegal' documentation nets: 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24
       else if (((net & 0xffffff00) == ((192 << 24) | (0  << 16) | (2   << 8))) ||
